@@ -27,11 +27,11 @@ export const DrizzlePlugin: DatabasePlugin = {
   getDependencies(): { prod: Dependency[]; dev: Dependency[] } {
     return {
       prod: [
-        { name: 'drizzle-orm', version: '^0.38.3' },
+        { name: 'drizzle-orm', version: '^0.45.1' },
         { name: 'postgres', version: '^3.4.5' }
       ],
       dev: [
-        { name: 'drizzle-kit', version: '^0.30.1' }
+        { name: 'drizzle-kit', version: '^0.31.8' }
       ]
     };
   },
