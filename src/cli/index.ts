@@ -3,9 +3,10 @@
 import * as p from '@clack/prompts';
 import { Command } from 'commander';
 import pc from 'picocolors';
+import { spawn } from 'node:child_process';
 import { registry, getFramework, getRuntime, getDatabase, getAuth, getCompatibleAuth } from '../core/registry.js';
 import { generateProject } from '../core/generator.js';
-import type { ProjectConfig, DatabasePlugin, AuthPlugin } from '../core/types.js';
+import type { ProjectConfig, DatabasePlugin, AuthPlugin, RuntimeAdapter } from '../core/types.js';
 
 const program = new Command();
 
@@ -22,6 +23,7 @@ program
   .option('-r, --runtime <runtime>', 'Runtime (node, bun)')
   .option('-d, --database <database>', 'Database (prisma, drizzle)')
   .option('-a, --auth <auth>', 'Auth (better-auth, passport)')
+  .option('-i, --install', 'Install dependencies after creation')
   .option('--no-docker', 'Skip Docker configuration')
   .option('--no-cors', 'Skip CORS middleware')
   .option('--no-logging', 'Skip logging middleware')
@@ -37,6 +39,7 @@ program
   .option('-r, --runtime <runtime>', 'Runtime (node, bun)')
   .option('-d, --database <database>', 'Database (prisma, drizzle)')
   .option('-a, --auth <auth>', 'Auth (better-auth, passport)')
+  .option('-i, --install', 'Install dependencies after creation')
   .option('--no-docker', 'Skip Docker configuration')
   .option('--no-cors', 'Skip CORS middleware')
   .option('--no-logging', 'Skip logging middleware')
@@ -56,6 +59,7 @@ async function runCreate(
     runtime?: string;
     database?: string;
     auth?: string;
+    install?: boolean;
     docker?: boolean;
     cors?: boolean;
     logging?: boolean;
@@ -75,6 +79,7 @@ async function runCreate(
     runtime: string;
     database: string | null;
     auth: string | null;
+    install: boolean;
     docker: boolean;
     cors: boolean;
     logging: boolean;
@@ -89,6 +94,7 @@ async function runCreate(
       runtime: options.runtime!,
       database: options.database || null,
       auth: options.auth || null,
+      install: options.install ?? false,
       docker: options.docker ?? true,
       cors: options.cors ?? true,
       logging: options.logging ?? true,
@@ -182,6 +188,12 @@ async function runCreate(
               { value: 'logging', label: 'Logging', hint: 'Request logging middleware' },
               { value: 'health', label: 'Health Check', hint: '/health endpoint' }
             ]
+          }),
+
+        install: () =>
+          p.confirm({
+            message: 'Install dependencies after creation?',
+            initialValue: true
           })
       },
       {
@@ -195,6 +207,7 @@ async function runCreate(
     const features = answers.features as string[];
     const database = answers.database as string;
     const auth = answers.auth as string;
+    const install = answers.install as boolean;
 
     config = {
       name: answers.name as string,
@@ -202,6 +215,7 @@ async function runCreate(
       runtime: answers.runtime as string,
       database: database === 'none' ? null : database,
       auth: auth === 'none' ? null : auth,
+      install,
       docker: features.includes('docker'),
       cors: features.includes('cors'),
       logging: features.includes('logging'),
@@ -284,8 +298,26 @@ async function runCreate(
     process.exit(1);
   }
 
+  // Install dependencies if requested
+  if (config.install) {
+    const installSpinner = p.spinner();
+    installSpinner.start('Installing dependencies...');
+
+    try {
+      await runInstall(config.name, runtime);
+      installSpinner.stop('Dependencies installed!');
+    } catch (error) {
+      installSpinner.stop('Failed to install dependencies');
+      p.log.warn('You can install manually with: ' + runtime.getInstallCommand([]));
+    }
+  }
+
   // Build next steps
-  let nextSteps = `cd ${config.name}\n${runtime.getInstallCommand([])}`;
+  let nextSteps = `cd ${config.name}`;
+
+  if (!config.install) {
+    nextSteps += `\n${runtime.getInstallCommand([])}`
+  }
 
   if (databasePlugin) {
     nextSteps += `\n\n# Setup database`;
@@ -302,6 +334,28 @@ async function runCreate(
   p.note(nextSteps, 'Next steps');
 
   p.outro(pc.green('Happy coding!'));
+}
+
+async function runInstall(projectDir: string, runtime: RuntimeAdapter): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cmd = runtime.name === 'bun' ? 'bun' : 'npm';
+    const args = ['install'];
+
+    const child = spawn(cmd, args, {
+      cwd: projectDir,
+      stdio: 'pipe'
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`Install failed with code ${code}`));
+      }
+    });
+
+    child.on('error', reject);
+  });
 }
 
 program.parse();
