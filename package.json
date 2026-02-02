@@ -1,0 +1,39 @@
+{
+  "name": "stacky",
+  "version": "0.1.0",
+  "description": "Framework-agnostic CLI scaffolding tool",
+  "type": "module",
+  "bin": {
+    "stacky": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "stacky": "node dist/cli/index.js"
+  },
+  "keywords": [
+    "cli",
+    "scaffold",
+    "hono",
+    "express",
+    "fastify",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^0.8.2",
+    "commander": "^12.1.0",
+    "ejs": "^3.1.10",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
