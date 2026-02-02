@@ -69,7 +69,7 @@ export const BetterAuthPlugin: AuthPlugin = {
         };
       case 'express':
         return {
-          code: `app.all('/api/auth/*', toNodeHandler(auth));`,
+          code: `app.all('/api/auth/*splat', toNodeHandler(auth));`,
           imports: [
             "import { toNodeHandler } from 'better-auth/node';",
             "import { auth } from './lib/auth.js';"

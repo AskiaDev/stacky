@@ -362,7 +362,7 @@ app.use(passport.session());`;
   // Add auth route
   let authRoute = '';
   if (config.auth?.name === 'better-auth') {
-    authRoute = "\n\n// Auth routes - must be before express.json()\napp.all('/api/auth/*', toNodeHandler(auth));";
+    authRoute = "\n\n// Auth routes\napp.all('/api/auth/*splat', toNodeHandler(auth));";
   }
 
   const healthRoute = config.features.healthCheck
