@@ -51,6 +51,9 @@ export async function generateProject(config: ProjectConfig): Promise<void> {
 
   // Generate .gitignore
   await generateGitignore(projectDir, config);
+
+  // Generate ESLint config (always included)
+  await generateEslintConfig(projectDir);
 }
 
 function buildContext(config: ProjectConfig): GenerationContext {
@@ -74,6 +77,13 @@ function buildContext(config: ProjectConfig): GenerationContext {
     deps.push(...authDeps.prod);
     devDeps.push(...authDeps.dev);
   }
+
+  // Add ESLint dependencies (always included)
+  devDeps.push(
+    { name: 'eslint', version: '^9.18.0' },
+    { name: '@eslint/js', version: '^9.18.0' },
+    { name: 'typescript-eslint', version: '^8.20.0' }
+  );
 
   // Collect env vars
   const envVars: EnvVar[] = [
@@ -100,6 +110,10 @@ function buildContext(config: ProjectConfig): GenerationContext {
   if (config.database) {
     Object.assign(scripts, config.database.getScripts());
   }
+
+  // Add lint script (always included)
+  scripts['lint'] = 'eslint src/';
+  scripts['lint:fix'] = 'eslint src/ --fix';
 
   // Build middleware imports and setup
   const imports: string[] = [];
@@ -711,4 +725,26 @@ ${config.runtime.name === 'bun' ? 'bun.lockb' : 'package-lock.json'}
 `;
 
   await fs.writeFile(path.join(projectDir, '.gitignore'), gitignore);
+}
+
+async function generateEslintConfig(projectDir: string): Promise<void> {
+  const eslintConfig = `import eslint from '@eslint/js';
+import tseslint from 'typescript-eslint';
+
+export default tseslint.config(
+  eslint.configs.recommended,
+  ...tseslint.configs.recommended,
+  {
+    ignores: ['dist/', 'node_modules/']
+  },
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'warn'
+    }
+  }
+);
+`;
+
+  await fs.writeFile(path.join(projectDir, 'eslint.config.js'), eslintConfig);
 }

@@ -9,6 +9,49 @@ import { generateProject } from '../core/generator.js';
 import type { ProjectConfig, DatabasePlugin, AuthPlugin, RuntimeAdapter } from '../core/types.js';
 
 const program = new Command();
+const isTTY = process.stdout.isTTY;
+
+// Helper functions for TTY-safe output
+function showIntro() {
+  if (isTTY) {
+    console.clear();
+    p.intro(pc.bgCyan(pc.black(' stacky ')));
+  } else {
+    console.log('stacky - Framework-agnostic CLI scaffolding tool\n');
+  }
+}
+
+function showError(message: string) {
+  if (isTTY) {
+    p.cancel(message);
+  } else {
+    console.error(`Error: ${message}`);
+  }
+}
+
+function showNote(content: string, title: string) {
+  if (isTTY) {
+    p.note(content, title);
+  } else {
+    console.log(`\n${title}:\n${content}\n`);
+  }
+}
+
+function showOutro(message: string) {
+  if (isTTY) {
+    p.outro(pc.green(message));
+  } else {
+    console.log(message);
+  }
+}
+
+function showWarn(message: string) {
+  if (isTTY) {
+    p.log.warn(message);
+  } else {
+    console.warn(`Warning: ${message}`);
+  }
+}
 
 program
   .name('stacky')
@@ -28,8 +71,8 @@ program
   .option('--no-cors', 'Skip CORS middleware')
   .option('--no-logging', 'Skip logging middleware')
   .option('--no-health', 'Skip health check endpoint')
-  .action(async (name, options) => {
-    await runCreate(name, options);
+  .action(async (name, _options, cmd) => {
+    await runCreate(name, cmd.optsWithGlobals());
   });
 
 // Default command (no subcommand) runs create
@@ -66,12 +109,10 @@ async function runCreate(
     health?: boolean;
   }
 ) {
-  console.clear();
-
-  p.intro(pc.bgCyan(pc.black(' stacky ')));
-
   // Check if we have all required options from CLI flags
   const hasAllFlags = projectName && options.framework && options.runtime;
+
+  showIntro();
 
   let config: {
     name: string;
@@ -101,7 +142,12 @@ async function runCreate(
       health: options.health ?? true
     };
   } else {
-    // Interactive mode
+    // Interactive mode requires TTY
+    if (!isTTY) {
+      showError('Interactive mode requires a TTY. Use flags: stacky <name> -f <framework> -r <runtime>');
+      process.exit(1);
+    }
+
     const answers = await p.group(
       {
         name: () =>
@@ -228,18 +274,18 @@ async function runCreate(
   const runtime = getRuntime(config.runtime);
 
   if (!framework) {
-    p.cancel(`Unknown framework: ${config.framework}`);
+    showError(`Unknown framework: ${config.framework}`);
     process.exit(1);
   }
 
   if (!runtime) {
-    p.cancel(`Unknown runtime: ${config.runtime}`);
+    showError(`Unknown runtime: ${config.runtime}`);
     process.exit(1);
   }
 
   // Check compatibility
   if (!framework.manifest.compatible.runtimes.includes(runtime.name)) {
-    p.cancel(`${framework.displayName} is not compatible with ${runtime.displayName}`);
+    showError(`${framework.displayName} is not compatible with ${runtime.displayName}`);
     process.exit(1);
   }
 
@@ -248,7 +294,7 @@ async function runCreate(
   if (config.database) {
     databasePlugin = getDatabase(config.database) || null;
     if (!databasePlugin) {
-      p.cancel(`Unknown database: ${config.database}`);
+      showError(`Unknown database: ${config.database}`);
       process.exit(1);
     }
   }
@@ -258,13 +304,13 @@ async function runCreate(
   if (config.auth) {
     // Auth requires database
     if (!databasePlugin) {
-      p.cancel('Authentication requires a database. Please select a database first.');
+      showError('Authentication requires a database. Please select a database first.');
       process.exit(1);
     }
 
     authPlugin = getAuth(config.auth) || null;
     if (!authPlugin) {
-      p.cancel(`Unknown auth: ${config.auth}`);
+      showError(`Unknown auth: ${config.auth}`);
       process.exit(1);
     }
   }
@@ -286,29 +332,50 @@ async function runCreate(
   };
 
   // Generate project
-  const s = p.spinner();
-  s.start('Creating your project...');
+  if (isTTY) {
+    const s = p.spinner();
+    s.start('Creating your project...');
 
-  try {
-    await generateProject(projectConfig);
-    s.stop('Project created successfully!');
-  } catch (error) {
-    s.stop('Failed to create project');
-    p.cancel(error instanceof Error ? error.message : 'Unknown error');
-    process.exit(1);
+    try {
+      await generateProject(projectConfig);
+      s.stop('Project created successfully!');
+    } catch (error) {
+      s.stop('Failed to create project');
+      showError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
+  } else {
+    console.log('Creating your project...');
+    try {
+      await generateProject(projectConfig);
+      console.log('Project created successfully!');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : 'Unknown error');
+      process.exit(1);
+    }
   }
 
   // Install dependencies if requested
   if (config.install) {
-    const installSpinner = p.spinner();
-    installSpinner.start('Installing dependencies...');
+    if (isTTY) {
+      const installSpinner = p.spinner();
+      installSpinner.start('Installing dependencies...');
 
-    try {
-      await runInstall(config.name, runtime);
-      installSpinner.stop('Dependencies installed!');
-    } catch (error) {
-      installSpinner.stop('Failed to install dependencies');
-      p.log.warn('You can install manually with: ' + runtime.getInstallCommand([]));
+      try {
+        await runInstall(config.name, runtime);
+        installSpinner.stop('Dependencies installed!');
+      } catch (error) {
+        installSpinner.stop('Failed to install dependencies');
+        showWarn('You can install manually with: ' + runtime.getInstallCommand([]));
+      }
+    } else {
+      console.log('Installing dependencies...');
+      try {
+        await runInstall(config.name, runtime);
+        console.log('Dependencies installed!');
+      } catch (error) {
+        showWarn('You can install manually with: ' + runtime.getInstallCommand([]));
+      }
     }
   }
 
@@ -331,9 +398,8 @@ async function runCreate(
   nextSteps += `\n\n# Start development\n${runtime.getRunCommand('dev')}`;
 
   // Success message
-  p.note(nextSteps, 'Next steps');
-
-  p.outro(pc.green('Happy coding!'));
+  showNote(nextSteps, 'Next steps');
+  showOutro('Happy coding!');
 }
 
 async function runInstall(projectDir: string, runtime: RuntimeAdapter): Promise<void> {
