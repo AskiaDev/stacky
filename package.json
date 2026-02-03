@@ -1,27 +1,46 @@
 {
-  "name": "stacky",
+  "name": "stacky-cli",
   "version": "0.1.0",
-  "description": "Framework-agnostic CLI scaffolding tool",
+  "description": "Framework-agnostic CLI scaffolding tool for backend applications",
   "type": "module",
   "bin": {
-    "stacky": "./dist/cli/index.js"
+    "stacky": "dist/cli/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
     "start": "node dist/cli/index.js",
     "stacky": "node dist/cli/index.js"
   },
   "keywords": [
     "cli",
     "scaffold",
+    "generator",
+    "boilerplate",
     "hono",
     "express",
     "fastify",
-    "typescript"
+    "typescript",
+    "bun",
+    "node",
+    "prisma",
+    "drizzle",
+    "better-auth"
   ],
-  "author": "",
+  "author": "AskiaDev",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AskiaDev/stacky.git"
+  },
+  "homepage": "https://github.com/AskiaDev/stacky#readme",
+  "bugs": {
+    "url": "https://github.com/AskiaDev/stacky/issues"
+  },
   "dependencies": {
     "@clack/prompts": "^0.8.2",
     "commander": "^12.1.0",

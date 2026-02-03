@@ -35,13 +35,13 @@ Stacky is a CLI tool that scaffolds production-ready backend projects with your 
 ## Installation
 
 ```bash
-npm install -g stacky
+npm install -g stacky-cli
 ```
 
 Or use directly with npx:
 
 ```bash
-npx stacky my-app
+npx stacky-cli my-app
 ```
 
 ---
